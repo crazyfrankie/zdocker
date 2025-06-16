@@ -4,6 +4,6 @@
 项目启发于 [自己动手写 Docker](https://github.com/xianlubird/mydocker)。
 
 # Progress
-## First step
+## 1. 基础知识入门
 - [ ] 看原书第二章
 - [ ] 动手实现书中示例
