@@ -9,6 +9,20 @@ import (
 	"syscall"
 )
 
+// 两次加入 Cgroup 操作：
+// 内核源码片段（简化）
+// void cgroup_procs_write() {
+//    if (在容器Namespace中操作) {
+//        // 设置进程树继承标志
+//        task->cgroups->dom_cgrp = cgrp;
+//    } else {
+//        // 仅加入单个进程
+//        cgroup_attach_task(cgrp, task);
+//    }
+//}
+// 第一次绑定是 进程级限制，仅限制单个进程
+// 第二次绑定是 进程树级 规则声明，建立继承链
+
 const cgroupMemoryHierarchyMount = "/sys/fs/cgroup"
 
 func main() {
