@@ -13,10 +13,8 @@ var initCommand = &cobra.Command{
 	Long:  "Init container process run user's process in container . Do not call it outside",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		log.Infof("init come on")
-		command := args[0]
-		log.Infof("command %s", command)
 
-		return container.RunContainerInitProcess(command, nil)
+		return container.RunContainerInitProcess()
 	},
 }
 
