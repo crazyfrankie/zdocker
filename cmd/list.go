@@ -12,17 +12,17 @@ import (
 	"github.com/crazyfrank/zdocker/container"
 )
 
-func init() {
-	rootCmd.AddCommand(listCmd)
-}
+func NewListCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "ps",
+		Short: "List all the containers",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ListContainers()
+			return nil
+		},
+	}
 
-var listCmd = &cobra.Command{
-	Use:   "ps",
-	Short: "list all the containers",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ListContainers()
-		return nil
-	},
+	return cmd
 }
 
 func ListContainers() {

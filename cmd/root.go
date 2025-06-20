@@ -13,8 +13,19 @@ const usage = `zdocker is a simple container runtime implementation.
 			   Enjoy it, just for fun.`
 
 func init() {
+	addCommand()
 	log.SetFormatter(&log.JSONFormatter{})
 	log.SetOutput(os.Stdout)
+}
+
+func addCommand() {
+	rootCmd.AddCommand(
+		NewRunCommand(),
+		NewInitCommand(),
+		NewCommitCommand(),
+		NewListCommand(),
+		NewLogCommand(),
+	)
 }
 
 var rootCmd = &cobra.Command{

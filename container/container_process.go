@@ -1,6 +1,7 @@
 package container
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
@@ -13,8 +14,9 @@ var (
 	STOP    = "stop"
 	EXIT    = "exit"
 
-	DefaultLocation = "/var/run/zdocker/%s/"
-	ConfigName      = "config.json"
+	DefaultLocation  = "/var/run/zdocker/%s/"
+	ConfigName       = "config.json"
+	ContainerLogFile = "container.log"
 )
 
 type ContainerInfo struct {
@@ -27,7 +29,7 @@ type ContainerInfo struct {
 }
 
 // NewParentProcess Build a new cmd that creates the container process.
-func NewParentProcess(tty bool, volume string) (*exec.Cmd, *os.File) {
+func NewParentProcess(tty bool, containerName string, volume string) (*exec.Cmd, *os.File) {
 	readPipe, writePipe, err := newPipe()
 	if err != nil {
 		log.Errorf("New pipe error %v", err)
@@ -42,6 +44,19 @@ func NewParentProcess(tty bool, volume string) (*exec.Cmd, *os.File) {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+	} else {
+		dirUrl := fmt.Sprintf(DefaultLocation, containerName)
+		if err := os.MkdirAll(dirUrl, 0622); err != nil {
+			log.Errorf("NewParentProcess mkdir %s error %v.", dirUrl, err)
+			return nil, nil
+		}
+		logFile := dirUrl + ContainerLogFile
+		stdLogFile, err := os.Create(logFile)
+		if err != nil {
+			log.Errorf("NewParentProcess create file %s error %v", logFile, err)
+			return nil, nil
+		}
+		cmd.Stdout = stdLogFile
 	}
 	cmd.ExtraFiles = []*os.File{readPipe}
 	rootUrl, mntUrl := "/root", "/root/mnt"

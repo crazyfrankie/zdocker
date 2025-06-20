@@ -21,7 +21,7 @@ const (
 	letterBytes = "1234567890"
 )
 
-var (
+type runOptions struct {
 	detach        bool
 	enableTTY     bool
 	containerName string
@@ -29,45 +29,48 @@ var (
 	memoryLimit   string
 	cpuShareLimit string
 	cpuSetLimit   string
-)
-
-func init() {
-	runCmd.Flags().SetInterspersed(false)
-	runCmd.Flags().BoolVarP(&detach, "detach", "d", false, "detach container")
-	runCmd.Flags().BoolVarP(&enableTTY, "ti", "t", false, "enable tty")
-	runCmd.Flags().StringVarP(&containerName, "name", "n", "", "container name")
-	runCmd.Flags().StringVarP(&volume, "volume", "v", "", "volume")
-	runCmd.Flags().StringVarP(&memoryLimit, "memory", "m", "", "memory limit")
-	runCmd.Flags().StringVarP(&cpuShareLimit, "cpushare", "", "", "cpushare limit")
-	runCmd.Flags().StringVarP(&cpuSetLimit, "cpuset", "", "", "cpuset limit")
-
-	rootCmd.AddCommand(runCmd)
 }
 
-var runCmd = &cobra.Command{
-	Use:          "run",
-	Short:        "Create a container with namespace and cgroups limit ie: zdocker run -ti [command]",
-	SilenceUsage: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return fmt.Errorf("missing container command")
-		}
-		if enableTTY && detach {
-			return errors.New("t and d parameter can not both provided")
-		}
-		Run(containerName, volume, enableTTY, args, &cgroups.ResourceConfig{
-			MemoryLimit: memoryLimit,
-			CpuShare:    cpuShareLimit,
-			CpuSet:      cpuSetLimit,
-		})
+func NewRunCommand() *cobra.Command {
+	var option runOptions
 
-		return nil
-	},
+	cmd := &cobra.Command{
+		Use:          "run",
+		Short:        "Create a container with namespace and cgroups limit ie: zdocker run -ti [command]",
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 1 {
+				return fmt.Errorf("missing container command")
+			}
+			if option.enableTTY && option.detach {
+				return errors.New("t and d parameter can not both provided")
+			}
+			Run(option, args, &cgroups.ResourceConfig{
+				MemoryLimit: option.memoryLimit,
+				CpuShare:    option.cpuShareLimit,
+				CpuSet:      option.cpuSetLimit,
+			})
+
+			return nil
+		},
+	}
+
+	flags := cmd.Flags()
+	flags.SetInterspersed(false)
+	flags.BoolVarP(&option.detach, "detach", "d", false, "detach container")
+	flags.BoolVarP(&option.enableTTY, "ti", "t", false, "enable tty")
+	flags.StringVarP(&option.containerName, "name", "n", "", "container name")
+	flags.StringVarP(&option.volume, "volume", "v", "", "volume")
+	flags.StringVarP(&option.memoryLimit, "memory", "m", "", "memory limit")
+	flags.StringVarP(&option.cpuShareLimit, "cpushare", "", "", "cpushare limit")
+	flags.StringVarP(&option.cpuSetLimit, "cpuset", "", "", "cpuset limit")
+
+	return cmd
 }
 
-func Run(containerName string, volume string, tty bool, commands []string, res *cgroups.ResourceConfig) {
+func Run(options runOptions, commands []string, res *cgroups.ResourceConfig) {
 	// build the parent process that created the container
-	parent, writePipe := container.NewParentProcess(tty, volume)
+	parent, writePipe := container.NewParentProcess(options.enableTTY, options.containerName, options.volume)
 	if parent == nil {
 		log.Errorf("New parent process error")
 		return
@@ -76,7 +79,7 @@ func Run(containerName string, volume string, tty bool, commands []string, res *
 		log.Error(err)
 	}
 	var err error
-	containerName, err = recordContainerInfo(parent.Process.Pid, containerName, commands)
+	options.containerName, err = recordContainerInfo(parent.Process.Pid, options.containerName, commands)
 	if err != nil {
 		log.Errorf("record container info error %v.", err)
 		return
@@ -89,12 +92,12 @@ func Run(containerName string, volume string, tty bool, commands []string, res *
 	cgroupManager.Apply(parent.Process.Pid)
 
 	sendInitCommand(commands, writePipe)
-	if tty {
+	if options.enableTTY {
 		parent.Wait()
-		deleteContainerInfo(containerName)
+		deleteContainerInfo(options.containerName)
 	}
 	rootUrl, mntUrl := "/root", "/root/mnt"
-	container.DeleteWorkSpace(rootUrl, mntUrl, volume)
+	container.DeleteWorkSpace(rootUrl, mntUrl, options.volume)
 	os.Exit(0)
 }
 

@@ -7,17 +7,17 @@ import (
 	"github.com/crazyfrank/zdocker/container"
 )
 
-var initCommand = &cobra.Command{
-	Use:   "init",
-	Short: "Init container process",
-	Long:  "Init container process run user's process in container . Do not call it outside",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		log.Infof("init come on")
+func NewInitCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Init container process",
+		Long:  "Init container process run user's process in container . Do not call it outside",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			log.Infof("init come on")
 
-		return container.RunContainerInitProcess()
-	},
-}
+			return container.RunContainerInitProcess()
+		},
+	}
 
-func init() {
-	rootCmd.AddCommand(initCommand)
+	return cmd
 }

@@ -9,26 +9,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
+type commitOptions struct {
 	imageName string
-)
-
-func init() {
-	commitCmd.Flags().StringVarP(&imageName, "image", "i", "", "commit image name")
-
-	rootCmd.AddCommand(commitCmd)
 }
 
-var commitCmd = &cobra.Command{
-	Use:   "commit",
-	Short: "commit a container into image",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return errors.New("missing container name and image name")
-		}
-		commitContainer(args[0])
-		return nil
-	},
+func NewCommitCommand() *cobra.Command {
+	var option commitOptions
+
+	cmd := &cobra.Command{
+		Use:   "commit",
+		Short: "Commit a container into image",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 1 {
+				return errors.New("missing container name and image name")
+			}
+			commitContainer(args[0])
+			return nil
+		},
+	}
+	flags := cmd.Flags()
+	flags.StringVarP(&option.imageName, "image", "i", "", "commit image name")
+
+	return cmd
 }
 
 func commitContainer(imageName string) {
