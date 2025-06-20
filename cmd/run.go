@@ -36,7 +36,7 @@ func NewRunCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:          "run",
-		Short:        "Create a container with namespace and cgroups limit ie: zdocker run -ti [command]",
+		Short:        "Create a container with namespace and cgroups limit ie: zdocker run -t [command]",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
@@ -68,9 +68,12 @@ func NewRunCommand() *cobra.Command {
 	return cmd
 }
 
-func Run(options runOptions, commands []string, res *cgroups.ResourceConfig) {
+func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
+	// get image name
+	imageName := args[0]
+	commands := args[1:]
 	// build the parent process that created the container
-	parent, writePipe := container.NewParentProcess(options.enableTTY, options.containerName, options.volume)
+	parent, writePipe := container.NewParentProcess(imageName, options.containerName, options.volume, options.enableTTY)
 	if parent == nil {
 		log.Errorf("New parent process error")
 		return
@@ -79,7 +82,7 @@ func Run(options runOptions, commands []string, res *cgroups.ResourceConfig) {
 		log.Error(err)
 	}
 	var err error
-	options.containerName, err = recordContainerInfo(parent.Process.Pid, options.containerName, commands)
+	options.containerName, err = recordContainerInfo(parent.Process.Pid, options.containerName, options.volume, commands)
 	if err != nil {
 		log.Errorf("record container info error %v.", err)
 		return
@@ -95,10 +98,8 @@ func Run(options runOptions, commands []string, res *cgroups.ResourceConfig) {
 	if options.enableTTY {
 		parent.Wait()
 		deleteContainerInfo(options.containerName)
+		container.DeleteWorkSpace(options.containerName, options.volume)
 	}
-	rootUrl, mntUrl := "/root", "/root/mnt"
-	container.DeleteWorkSpace(rootUrl, mntUrl, options.volume)
-	os.Exit(0)
 }
 
 func sendInitCommand(commands []string, writePipe *os.File) {
@@ -108,7 +109,7 @@ func sendInitCommand(commands []string, writePipe *os.File) {
 	writePipe.Close()
 }
 
-func recordContainerInfo(pid int, containerName string, commands []string) (string, error) {
+func recordContainerInfo(pid int, containerName string, volume string, commands []string) (string, error) {
 	cid := randStringBytes(10)
 	createTime := time.Now().Format(time.DateTime)
 	command := strings.Join(commands, "")
@@ -123,6 +124,7 @@ func recordContainerInfo(pid int, containerName string, commands []string) (stri
 		Command:    command,
 		CreateTime: createTime,
 		Status:     container.RUNNING,
+		Volume:     volume,
 	}
 	data, err := sonic.Marshal(containerInfo)
 	if err != nil {

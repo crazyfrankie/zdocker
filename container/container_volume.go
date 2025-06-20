@@ -10,16 +10,25 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func NewWorkSpace(rootUrl string, mntUrl string, volumeUrl string) {
-	createLowerLayer(rootUrl)
-	createUpperLayer(rootUrl)
-	createWorkDir(rootUrl)
-	createMountPoint(rootUrl, mntUrl)
-	if volumeUrl != "" {
-		volumeUrls := strings.Split(volumeUrl, ":")
+// Constants for overlay2 filesystem structure
+const (
+	RootUrl       = "/root"
+	MntUrl        = "/root/mnt/%s"
+	WriteLayerUrl = "/root/writeLayer/%s"
+	OverlayLower  = "/root/%s"
+	OverlayWork   = "/root/workdir/%s"
+)
+
+func NewWorkSpace(imageName string, containerName string, volume string) {
+	createLowerLayer(imageName)
+	createUpperLayer(containerName)
+	createWorkDir(containerName)
+	createMountPoint(imageName, containerName)
+	if volume != "" {
+		volumeUrls := strings.Split(volume, ":")
 		if len(volumeUrls) == 2 && volumeUrls[0] != "" && volumeUrls[1] != "" {
-			mountVolume(mntUrl, volumeUrls)
-			log.Infof("%q", volumeUrls)
+			mountVolume(containerName, volumeUrls)
+			log.Infof("NewWorkSpace volume urls %q", volumeUrls)
 		} else {
 			log.Infof("volumeUrl parameter input is not correct.")
 		}
@@ -27,44 +36,45 @@ func NewWorkSpace(rootUrl string, mntUrl string, volumeUrl string) {
 }
 
 // createReadOnlyLayer extract busybox.tar into the busybox directory as a read-only layer for the container
-func createLowerLayer(rootUrl string) {
-	lowerDir := filepath.Join(rootUrl, "lower")
-	busyboxTar := filepath.Join(rootUrl, "busybox.tar")
+func createLowerLayer(imageName string) {
+	lowerDir := fmt.Sprintf(OverlayLower, imageName)
+	imageUrl := filepath.Join(RootUrl, fmt.Sprintf("%s.tar", imageName))
 	exists, err := pathExists(lowerDir)
 	if err != nil {
 		log.Errorf("check lower dir error: %v", err)
 	}
 	if !exists {
-		if err := os.Mkdir(lowerDir, 0777); err != nil {
+		if err := os.MkdirAll(lowerDir, 0777); err != nil {
 			log.Errorf("mkdir lower dir error: %v", err)
 		}
-		if _, err := exec.Command("tar", "-xvf", busyboxTar, "-C", lowerDir, "--strip-components=1").CombinedOutput(); err != nil {
+		if _, err := exec.Command("tar", "-xvf", imageUrl, "-C", lowerDir, "--strip-components=1").CombinedOutput(); err != nil {
 			log.Errorf("untar busybox error: %v", err)
 		}
 	}
 }
 
-func createUpperLayer(rootUrl string) {
-	upperDir := filepath.Join(rootUrl, "upper")
+func createUpperLayer(containerName string) {
+	upperDir := fmt.Sprintf(WriteLayerUrl, containerName)
 	if err := os.MkdirAll(upperDir, 0777); err != nil {
-		log.Errorf("mkdir upper dir error: %v", err)
+		log.Errorf("mkdir upper dir %s error: %v", upperDir, err)
 	}
 }
 
-func createWorkDir(rootUrl string) {
-	workDir := filepath.Join(rootUrl, "work")
+func createWorkDir(containerName string) {
+	workDir := fmt.Sprintf(OverlayWork, containerName)
 	if err := os.MkdirAll(workDir, 0777); err != nil {
-		log.Errorf("mkdir work dir error: %v", err)
+		log.Errorf("mkdir work dir %s error: %v", workDir, err)
 	}
 }
 
-func createMountPoint(rootUrl, mntUrl string) {
+func createMountPoint(imageName string, containerName string) {
+	mntUrl := fmt.Sprintf(MntUrl, containerName)
 	if err := os.MkdirAll(mntUrl, 0777); err != nil {
 		log.Errorf("mkdir mount point error: %v", err)
 	}
-	lowerDir := filepath.Join(rootUrl, "lower")
-	upperDir := filepath.Join(rootUrl, "upper")
-	workDir := filepath.Join(rootUrl, "work")
+	lowerDir := fmt.Sprintf(OverlayLower, imageName)
+	upperDir := fmt.Sprintf(WriteLayerUrl, containerName)
+	workDir := fmt.Sprintf(OverlayWork, containerName)
 
 	options := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lowerDir, upperDir, workDir)
 	cmd := exec.Command("mount", "-t", "overlay", "overlay", "-o", options, mntUrl)
@@ -75,19 +85,30 @@ func createMountPoint(rootUrl, mntUrl string) {
 	}
 }
 
-func mountVolume(mntUrl string, volumeUrls []string) {
+func mountVolume(containerName string, volumeUrls []string) {
 	// create host dir
 	parentUrl := volumeUrls[0]
-	containerDir := filepath.Join(mntUrl, volumeUrls[1])
-	if err := os.Mkdir(parentUrl, 0777); err != nil {
+	mntUrl := fmt.Sprintf(MntUrl, containerName)
+
+	// handle container path - remove leading slash if present
+	containerPath := volumeUrls[1]
+	if strings.HasPrefix(containerPath, "/") {
+		containerPath = containerPath[1:]
+	}
+	containerVolumeDir := filepath.Join(mntUrl, containerPath)
+
+	// ensure host directory exists
+	if err := os.MkdirAll(parentUrl, 0777); err != nil {
 		log.Infof("mkdir parent dir %s error. %v", parentUrl, err)
 	}
+
 	// create a mount point on the container filesystem.
-	if err := os.Mkdir(containerDir, 0777); err != nil {
-		log.Infof("mkdir container dir %s error. %v", containerDir, err)
+	if err := os.MkdirAll(containerVolumeDir, 0777); err != nil {
+		log.Infof("mkdir container dir %s error. %v", containerVolumeDir, err)
 	}
+
 	// mount the host file directory to the container mount point
-	cmd := exec.Command("mount", "--bind", parentUrl, containerDir)
+	cmd := exec.Command("mount", "--bind", parentUrl, containerVolumeDir)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -106,34 +127,58 @@ func pathExists(path string) (bool, error) {
 	return false, err
 }
 
-func DeleteWorkSpace(rootUrl, mntUrl, volumeUrl string) {
-	if volumeUrl != "" {
-		volumeUrls := strings.Split(volumeUrl, ":")
+func DeleteWorkSpace(containerName string, volume string) {
+	if volume != "" {
+		volumeUrls := strings.Split(volume, ":")
 		if len(volumeUrls) == 2 && volumeUrls[0] != "" && volumeUrls[1] != "" {
-			deleteVolumeMount(mntUrl, volumeUrls)
+			deleteVolumeMount(containerName, volumeUrls)
 		}
 	}
-	deleteMountPoint(mntUrl)
-	deleteOverlayDirs(rootUrl)
+	deleteMountPoint(containerName)
+	deleteOverlayDirs(containerName)
 }
 
-func deleteVolumeMount(mntUrl string, volumeUrls []string) {
-	containerDir := filepath.Join(mntUrl, volumeUrls[1])
+func deleteVolumeMount(containerName string, volumeUrls []string) error {
+	mntURL := fmt.Sprintf(MntUrl, containerName)
+
+	// handle container path - remove leading slash if present
+	containerPath := volumeUrls[1]
+	if strings.HasPrefix(containerPath, "/") {
+		containerPath = containerPath[1:]
+	}
+	containerDir := filepath.Join(mntURL, containerPath)
+
 	cmd := exec.Command("umount", containerDir)
 	if err := cmd.Run(); err != nil {
 		log.Errorf("umount container dir failed %v", err)
+		return err
 	}
+
+	return nil
 }
 
-func deleteMountPoint(mntUrl string) {
-	cmd := exec.Command("umount", mntUrl)
-	cmd.Run()
+func deleteMountPoint(containerName string) error {
+	mntUrl := fmt.Sprintf(MntUrl, containerName)
+	_, err := exec.Command("umount", mntUrl).CombinedOutput()
+	if err != nil {
+		log.Errorf("unmount %s error %v", mntUrl, err)
+		return err
+	}
 	if err := os.RemoveAll(mntUrl); err != nil {
-		log.Errorf("remove mount point error: %v", err)
+		log.Errorf("remove mount point dir %s error: %v", mntUrl, err)
+		return err
 	}
+
+	return nil
 }
 
-func deleteOverlayDirs(rootUrl string) {
-	os.RemoveAll(filepath.Join(rootUrl, "upper"))
-	os.RemoveAll(filepath.Join(rootUrl, "work"))
+func deleteOverlayDirs(containerName string) {
+	writeUrl := fmt.Sprintf(WriteLayerUrl, containerName)
+	if err := os.RemoveAll(writeUrl); err != nil {
+		log.Infof("Remove writeLayer dir %s error %v", writeUrl, err)
+	}
+	workUrl := fmt.Sprintf(OverlayWork, containerName)
+	if err := os.RemoveAll(workUrl); err != nil {
+		log.Infof("Remove writeLayer dir %s error %v", workUrl, err)
+	}
 }

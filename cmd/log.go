@@ -34,6 +34,7 @@ func ListContainerLogs(containerName string) {
 	logFile := dirUrl + container.ContainerLogFile
 	file, err := os.Open(logFile)
 	defer file.Close()
+
 	if err != nil {
 		log.Errorf("Log container open file %s error %v", logFile, err)
 		return

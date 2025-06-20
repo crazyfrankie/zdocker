@@ -26,10 +26,11 @@ type ContainerInfo struct {
 	Command    string `json:"command"`
 	CreateTime string `json:"createTime"`
 	Status     string `json:"status"`
+	Volume     string `json:"volume"`
 }
 
 // NewParentProcess Build a new cmd that creates the container process.
-func NewParentProcess(tty bool, containerName string, volume string) (*exec.Cmd, *os.File) {
+func NewParentProcess(imageName string, containerName string, volume string, tty bool) (*exec.Cmd, *os.File) {
 	readPipe, writePipe, err := newPipe()
 	if err != nil {
 		log.Errorf("New pipe error %v", err)
@@ -59,9 +60,8 @@ func NewParentProcess(tty bool, containerName string, volume string) (*exec.Cmd,
 		cmd.Stdout = stdLogFile
 	}
 	cmd.ExtraFiles = []*os.File{readPipe}
-	rootUrl, mntUrl := "/root", "/root/mnt"
-	NewWorkSpace(rootUrl, mntUrl, volume)
-	cmd.Dir = mntUrl
+	NewWorkSpace(imageName, containerName, volume)
+	cmd.Dir = fmt.Sprintf(MntUrl, containerName)
 	return cmd, writePipe
 }
 
