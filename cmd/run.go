@@ -29,6 +29,7 @@ type runOptions struct {
 	memoryLimit   string
 	cpuShareLimit string
 	cpuSetLimit   string
+	environments  []string
 }
 
 func NewRunCommand() *cobra.Command {
@@ -64,6 +65,7 @@ func NewRunCommand() *cobra.Command {
 	flags.StringVarP(&option.memoryLimit, "memory", "m", "", "memory limit")
 	flags.StringVarP(&option.cpuShareLimit, "cpushare", "", "", "cpushare limit")
 	flags.StringVarP(&option.cpuSetLimit, "cpuset", "", "", "cpuset limit")
+	flags.StringArrayVarP(&option.environments, "env", "e", []string{}, "container running env (e.g., -e KEY1=value1 -e KEY2=value2)")
 
 	return cmd
 }
@@ -73,7 +75,7 @@ func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
 	imageName := args[0]
 	commands := args[1:]
 	// build the parent process that created the container
-	parent, writePipe := container.NewParentProcess(imageName, options.containerName, options.volume, options.enableTTY)
+	parent, writePipe := container.NewParentProcess(imageName, options.containerName, options.volume, options.enableTTY, options.environments)
 	if parent == nil {
 		log.Errorf("New parent process error")
 		return

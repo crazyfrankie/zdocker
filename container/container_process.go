@@ -30,7 +30,7 @@ type ContainerInfo struct {
 }
 
 // NewParentProcess Build a new cmd that creates the container process.
-func NewParentProcess(imageName string, containerName string, volume string, tty bool) (*exec.Cmd, *os.File) {
+func NewParentProcess(imageName string, containerName string, volume string, tty bool, envs []string) (*exec.Cmd, *os.File) {
 	readPipe, writePipe, err := newPipe()
 	if err != nil {
 		log.Errorf("New pipe error %v", err)
@@ -60,6 +60,7 @@ func NewParentProcess(imageName string, containerName string, volume string, tty
 		cmd.Stdout = stdLogFile
 	}
 	cmd.ExtraFiles = []*os.File{readPipe}
+	cmd.Env = append(os.Environ(), envs...)
 	NewWorkSpace(imageName, containerName, volume)
 	cmd.Dir = fmt.Sprintf(MntUrl, containerName)
 	return cmd, writePipe

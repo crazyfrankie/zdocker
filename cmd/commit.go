@@ -3,11 +3,12 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/crazyfrank/zdocker/container"
 	"os/exec"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/crazyfrank/zdocker/container"
 )
 
 type commitOptions struct {
