@@ -8,6 +8,24 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	RUNNING = "running"
+	STOP    = "stop"
+	EXIT    = "exit"
+
+	DefaultLocation = "/var/run/zdocker/%s/"
+	ConfigName      = "config.json"
+)
+
+type ContainerInfo struct {
+	PID        string `json:"pid"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Command    string `json:"command"`
+	CreateTime string `json:"createTime"`
+	Status     string `json:"status"`
+}
+
 // NewParentProcess Build a new cmd that creates the container process.
 func NewParentProcess(tty bool, volume string) (*exec.Cmd, *os.File) {
 	readPipe, writePipe, err := newPipe()

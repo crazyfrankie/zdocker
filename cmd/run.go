@@ -3,9 +3,13 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/bytedance/sonic"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -13,9 +17,14 @@ import (
 	"github.com/crazyfrank/zdocker/container"
 )
 
+const (
+	letterBytes = "1234567890"
+)
+
 var (
 	detach        bool
 	enableTTY     bool
+	containerName string
 	volume        string
 	memoryLimit   string
 	cpuShareLimit string
@@ -26,6 +35,7 @@ func init() {
 	runCmd.Flags().SetInterspersed(false)
 	runCmd.Flags().BoolVarP(&detach, "detach", "d", false, "detach container")
 	runCmd.Flags().BoolVarP(&enableTTY, "ti", "t", false, "enable tty")
+	runCmd.Flags().StringVarP(&containerName, "name", "n", "", "container name")
 	runCmd.Flags().StringVarP(&volume, "volume", "v", "", "volume")
 	runCmd.Flags().StringVarP(&memoryLimit, "memory", "m", "", "memory limit")
 	runCmd.Flags().StringVarP(&cpuShareLimit, "cpushare", "", "", "cpushare limit")
@@ -35,11 +45,9 @@ func init() {
 }
 
 var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Create a container with namespace and cgroups limit ie: zdocker run -ti [command]",
-	// 命令出错时，不打印帮助信息。设置为 true 可以确保命令出错时一眼就能看到错误信息
+	Use:          "run",
+	Short:        "Create a container with namespace and cgroups limit ie: zdocker run -ti [command]",
 	SilenceUsage: true,
-	// 指定调用 cmd.Execute() 时，执行的 Run 函数
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return fmt.Errorf("missing container command")
@@ -47,7 +55,7 @@ var runCmd = &cobra.Command{
 		if enableTTY && detach {
 			return errors.New("t and d parameter can not both provided")
 		}
-		Run(enableTTY, volume, args, &cgroups.ResourceConfig{
+		Run(containerName, volume, enableTTY, args, &cgroups.ResourceConfig{
 			MemoryLimit: memoryLimit,
 			CpuShare:    cpuShareLimit,
 			CpuSet:      cpuSetLimit,
@@ -57,7 +65,7 @@ var runCmd = &cobra.Command{
 	},
 }
 
-func Run(tty bool, volume string, commands []string, res *cgroups.ResourceConfig) {
+func Run(containerName string, volume string, tty bool, commands []string, res *cgroups.ResourceConfig) {
 	// build the parent process that created the container
 	parent, writePipe := container.NewParentProcess(tty, volume)
 	if parent == nil {
@@ -67,6 +75,13 @@ func Run(tty bool, volume string, commands []string, res *cgroups.ResourceConfig
 	if err := parent.Start(); err != nil {
 		log.Error(err)
 	}
+	var err error
+	containerName, err = recordContainerInfo(parent.Process.Pid, containerName, commands)
+	if err != nil {
+		log.Errorf("record container info error %v.", err)
+		return
+	}
+
 	cgroupManager := cgroups.NewCgroupManager("zdocker")
 	defer cgroupManager.Destroy()
 
@@ -76,6 +91,7 @@ func Run(tty bool, volume string, commands []string, res *cgroups.ResourceConfig
 	sendInitCommand(commands, writePipe)
 	if tty {
 		parent.Wait()
+		deleteContainerInfo(containerName)
 	}
 	rootUrl, mntUrl := "/root", "/root/mnt"
 	container.DeleteWorkSpace(rootUrl, mntUrl, volume)
@@ -87,4 +103,66 @@ func sendInitCommand(commands []string, writePipe *os.File) {
 	log.Infof("command all is %s", command)
 	writePipe.WriteString(command)
 	writePipe.Close()
+}
+
+func recordContainerInfo(pid int, containerName string, commands []string) (string, error) {
+	cid := randStringBytes(10)
+	createTime := time.Now().Format(time.DateTime)
+	command := strings.Join(commands, "")
+	// if user not pick container name, then use cid as container name
+	if containerName == "" {
+		containerName = cid
+	}
+	containerInfo := &container.ContainerInfo{
+		PID:        strconv.Itoa(pid),
+		ID:         cid,
+		Name:       containerName,
+		Command:    command,
+		CreateTime: createTime,
+		Status:     container.RUNNING,
+	}
+	data, err := sonic.Marshal(containerInfo)
+	if err != nil {
+		log.Errorf("record container info error %v", err)
+		return "", err
+	}
+	json := string(data)
+	// container info path
+	dirUrl := fmt.Sprintf(container.DefaultLocation, containerName)
+	if err := os.MkdirAll(dirUrl, 0622); err != nil {
+		log.Errorf("mkdir error %s error %v.", dirUrl, err)
+		return "", err
+	}
+	fileName := dirUrl + "/" + container.ConfigName
+	// create config.json
+	file, err := os.Create(fileName)
+	if err != nil {
+		log.Errorf("create file %s error %v.", fileName, err)
+		return "", err
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString(json); err != nil {
+		log.Errorf("file write string error %v", err)
+		return "", err
+	}
+
+	return containerName, nil
+}
+
+func deleteContainerInfo(containerName string) {
+	dirUrl := container.DefaultLocation + "/" + containerName
+	if err := os.RemoveAll(dirUrl); err != nil {
+		log.Errorf("remove dir %s error %v.", dirUrl, err)
+	}
+}
+
+func randStringBytes(n int) string {
+	rand.New(rand.NewSource(time.Now().UnixNano()))
+	var res strings.Builder
+	for i := 0; i < n; i++ {
+		res.WriteString(strconv.Itoa(rand.Intn(len(letterBytes))))
+	}
+
+	return res.String()
 }
