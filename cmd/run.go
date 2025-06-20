@@ -14,6 +14,7 @@ import (
 
 var (
 	enableTTY     bool
+	volume        string
 	memoryLimit   string
 	cpuShareLimit string
 	cpuSetLimit   string
@@ -22,6 +23,7 @@ var (
 func init() {
 	runCmd.Flags().SetInterspersed(false)
 	runCmd.Flags().BoolVarP(&enableTTY, "ti", "t", false, "enable tty")
+	runCmd.Flags().StringVarP(&volume, "volume", "v", "", "volume")
 	runCmd.Flags().StringVarP(&memoryLimit, "memory", "m", "", "memory limit")
 	runCmd.Flags().StringVarP(&cpuShareLimit, "cpushare", "", "", "cpushare limit")
 	runCmd.Flags().StringVarP(&cpuSetLimit, "cpuset", "", "", "cpuset limit")
@@ -39,7 +41,7 @@ var runCmd = &cobra.Command{
 		if len(args) < 1 {
 			return fmt.Errorf("missing container command")
 		}
-		Run(enableTTY, args, &cgroups.ResourceConfig{
+		Run(enableTTY, volume, args, &cgroups.ResourceConfig{
 			MemoryLimit: memoryLimit,
 			CpuShare:    cpuShareLimit,
 			CpuSet:      cpuSetLimit,
@@ -49,14 +51,14 @@ var runCmd = &cobra.Command{
 	},
 }
 
-func Run(tty bool, commands []string, res *cgroups.ResourceConfig) {
-	// 构建创建容器的父进程
-	parent, writePipe := container.NewParentProcess(tty)
+func Run(tty bool, volume string, commands []string, res *cgroups.ResourceConfig) {
+	// build the parent process that created the container
+	parent, writePipe := container.NewParentProcess(tty, volume)
 	if parent == nil {
 		log.Errorf("New parent process error")
 		return
 	}
-	if err := parent.Start(); err != nil { // 执行创建容器
+	if err := parent.Start(); err != nil {
 		log.Error(err)
 	}
 	cgroupManager := cgroups.NewCgroupManager("zdocker")
@@ -67,8 +69,8 @@ func Run(tty bool, commands []string, res *cgroups.ResourceConfig) {
 
 	sendInitCommand(commands, writePipe)
 	parent.Wait()
-	root, mnt := "/root", "/root/mnt"
-	container.DeleteWorkSpace(root, mnt)
+	rootUrl, mntUrl := "/root", "/root/mnt"
+	container.DeleteWorkSpace(rootUrl, mntUrl, volume)
 	os.Exit(0)
 }
 

@@ -9,7 +9,7 @@ import (
 )
 
 // NewParentProcess Build a new cmd that creates the container process.
-func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
+func NewParentProcess(tty bool, volume string) (*exec.Cmd, *os.File) {
 	readPipe, writePipe, err := newPipe()
 	if err != nil {
 		log.Errorf("New pipe error %v", err)
@@ -26,9 +26,9 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 		cmd.Stderr = os.Stderr
 	}
 	cmd.ExtraFiles = []*os.File{readPipe}
-	root, mnt := "/root", "/root/mnt"
-	NewWorkSpace(root, mnt)
-	cmd.Dir = mnt
+	rootUrl, mntUrl := "/root", "/root/mnt"
+	NewWorkSpace(rootUrl, mntUrl, volume)
+	cmd.Dir = mntUrl
 	return cmd, writePipe
 }
 
