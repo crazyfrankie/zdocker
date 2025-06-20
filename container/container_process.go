@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// NewParentProcess 构建一个新的 cmd 能够去创建容器进程
+// NewParentProcess Build a new cmd that creates the container process.
 func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 	readPipe, writePipe, err := newPipe()
 	if err != nil {
@@ -26,6 +26,9 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 		cmd.Stderr = os.Stderr
 	}
 	cmd.ExtraFiles = []*os.File{readPipe}
+	root, mnt := "/root", "/root/mnt"
+	NewWorkSpace(root, mnt)
+	cmd.Dir = mnt
 	return cmd, writePipe
 }
 
