@@ -20,7 +20,7 @@ const EnvExecCMD = "zdocker_cmd"
 
 func NewExecCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "exec",
+		Use:   "exec [CONTAINER] [COMMAND] [ARG...]",
 		Short: "exec a command into container",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// This is for callback
@@ -39,6 +39,7 @@ func NewExecCommand() *cobra.Command {
 
 			return nil
 		},
+		DisableFlagsInUseLine: true,
 	}
 
 	return cmd

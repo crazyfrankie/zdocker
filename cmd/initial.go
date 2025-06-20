@@ -17,6 +17,7 @@ func NewInitCommand() *cobra.Command {
 
 			return container.RunContainerInitProcess()
 		},
+		DisableFlagsInUseLine: true,
 	}
 
 	return cmd

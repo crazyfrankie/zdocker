@@ -14,7 +14,7 @@ import (
 
 func NewLogCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "logs",
+		Use:   "logs [CONTAINER]",
 		Short: "Fetch the logs of a container",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 0 {
@@ -24,6 +24,7 @@ func NewLogCommand() *cobra.Command {
 			ListContainerLogs(containerName)
 			return nil
 		},
+		DisableFlagsInUseLine: true,
 	}
 
 	return cmd

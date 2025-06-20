@@ -20,6 +20,7 @@ func NewListCommand() *cobra.Command {
 			ListContainers()
 			return nil
 		},
+		DisableFlagsInUseLine: true,
 	}
 
 	return cmd

@@ -36,7 +36,7 @@ func NewRunCommand() *cobra.Command {
 	var option runOptions
 
 	cmd := &cobra.Command{
-		Use:          "run",
+		Use:          "run [OPTIONS] IMAGE [COMMAND] [ARG...]",
 		Short:        "Create a container with namespace and cgroups limit ie: zdocker run -t [command]",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -54,6 +54,7 @@ func NewRunCommand() *cobra.Command {
 
 			return nil
 		},
+		DisableFlagsInUseLine: true,
 	}
 
 	flags := cmd.Flags()

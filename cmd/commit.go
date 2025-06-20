@@ -19,7 +19,7 @@ func NewCommitCommand() *cobra.Command {
 	var option commitOptions
 
 	cmd := &cobra.Command{
-		Use:   "commit",
+		Use:   "commit [CONTAINER] [IMAGE]",
 		Short: "Commit a container into image",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 2 {
@@ -28,6 +28,7 @@ func NewCommitCommand() *cobra.Command {
 			commitContainer(args[0], args[1])
 			return nil
 		},
+		DisableFlagsInUseLine: true,
 	}
 	flags := cmd.Flags()
 	flags.StringVarP(&option.imageName, "image", "i", "", "commit image name")

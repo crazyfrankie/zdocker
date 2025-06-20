@@ -13,7 +13,7 @@ import (
 
 func NewRemoveCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rm",
+		Use:   "rm [CONTAINER]",
 		Short: "remove a container",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
@@ -22,6 +22,7 @@ func NewRemoveCommand() *cobra.Command {
 			removeContainer(args[0])
 			return nil
 		},
+		DisableFlagsInUseLine: true,
 	}
 
 	return cmd
