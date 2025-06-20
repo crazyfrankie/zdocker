@@ -74,6 +74,12 @@ func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
 	// get image name
 	imageName := args[0]
 	commands := args[1:]
+
+	// Handle default commands like Docker does
+	if len(commands) == 0 {
+		commands = getDefaultCommand(imageName, options.detach)
+	}
+
 	// build the parent process that created the container
 	parent, writePipe := container.NewParentProcess(imageName, options.containerName, options.volume, options.enableTTY, options.environments)
 	if parent == nil {
@@ -101,6 +107,30 @@ func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
 		parent.Wait()
 		deleteContainerInfo(options.containerName)
 		container.DeleteWorkSpace(options.containerName, options.volume)
+	} else {
+		// For detach mode, we don't wait for the container to finish
+		log.Infof("Container %s is running in detach mode with PID %d", options.containerName, parent.Process.Pid)
+	}
+}
+
+// getDefaultCommand returns default commands for different images like Docker does
+func getDefaultCommand(imageName string, isDetach bool) []string {
+	switch imageName {
+	case "busybox":
+		if isDetach {
+			// For detach mode, use a command that keeps the container running
+			return []string{"sleep", "infinity"}
+		} else {
+			// For interactive mode, use shell
+			return []string{"sh"}
+		}
+	default:
+		// For unknown images, try to keep them running in detach mode
+		if isDetach {
+			return []string{"sleep", "infinity"}
+		} else {
+			return []string{"sh"}
+		}
 	}
 }
 
