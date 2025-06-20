@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -13,6 +14,7 @@ import (
 )
 
 var (
+	detach        bool
 	enableTTY     bool
 	volume        string
 	memoryLimit   string
@@ -22,6 +24,7 @@ var (
 
 func init() {
 	runCmd.Flags().SetInterspersed(false)
+	runCmd.Flags().BoolVarP(&detach, "detach", "d", false, "detach container")
 	runCmd.Flags().BoolVarP(&enableTTY, "ti", "t", false, "enable tty")
 	runCmd.Flags().StringVarP(&volume, "volume", "v", "", "volume")
 	runCmd.Flags().StringVarP(&memoryLimit, "memory", "m", "", "memory limit")
@@ -40,6 +43,9 @@ var runCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return fmt.Errorf("missing container command")
+		}
+		if enableTTY && detach {
+			return errors.New("t and d parameter can not both provided")
 		}
 		Run(enableTTY, volume, args, &cgroups.ResourceConfig{
 			MemoryLimit: memoryLimit,
@@ -68,7 +74,9 @@ func Run(tty bool, volume string, commands []string, res *cgroups.ResourceConfig
 	cgroupManager.Apply(parent.Process.Pid)
 
 	sendInitCommand(commands, writePipe)
-	parent.Wait()
+	if tty {
+		parent.Wait()
+	}
 	rootUrl, mntUrl := "/root", "/root/mnt"
 	container.DeleteWorkSpace(rootUrl, mntUrl, volume)
 	os.Exit(0)
