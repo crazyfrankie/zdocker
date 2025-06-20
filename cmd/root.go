@@ -27,6 +27,7 @@ func addCommand() {
 		NewLogCommand(),
 		NewExecCommand(),
 		NewStopCommand(),
+		NewRemoveCommand(),
 	)
 }
 
