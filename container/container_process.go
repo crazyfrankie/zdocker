@@ -14,19 +14,20 @@ var (
 	STOP    = "stop"
 	EXIT    = "exit"
 
-	DefaultLocation  = "/var/run/zdocker/%s/"
+	DefaultLocation  = "/var/run/zdocker/containers/%s/"
 	ConfigName       = "config.json"
 	ContainerLogFile = "container.log"
 )
 
 type ContainerInfo struct {
-	PID        string `json:"pid"`
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Command    string `json:"command"`
-	CreateTime string `json:"createTime"`
-	Status     string `json:"status"`
-	Volume     string `json:"volume"`
+	PID         string   `json:"pid"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Command     string   `json:"command"`
+	CreateTime  string   `json:"createTime"`
+	Status      string   `json:"status"`
+	Volume      string   `json:"volume"`
+	PortMapping []string `json:"portMapping"`
 }
 
 // NewParentProcess Build a new cmd that creates the container process.

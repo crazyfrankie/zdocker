@@ -28,6 +28,7 @@ func addCommand() {
 		NewExecCommand(),
 		NewStopCommand(),
 		NewRemoveCommand(),
+		NewNetworkCommand(),
 	)
 }
 

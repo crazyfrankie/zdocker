@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"github.com/crazyfrank/zdocker/network"
 	"math/rand"
 	"os"
 	"strconv"
@@ -29,7 +30,9 @@ type runOptions struct {
 	memoryLimit   string
 	cpuShareLimit string
 	cpuSetLimit   string
+	network       string
 	environments  []string
+	portMapping   []string
 }
 
 func NewRunCommand() *cobra.Command {
@@ -66,6 +69,8 @@ func NewRunCommand() *cobra.Command {
 	flags.StringVarP(&option.memoryLimit, "memory", "m", "", "memory limit")
 	flags.StringVarP(&option.cpuShareLimit, "cpushare", "", "", "cpushare limit")
 	flags.StringVarP(&option.cpuSetLimit, "cpuset", "", "", "cpuset limit")
+	flags.StringVarP(&option.network, "net", "", "", "container network")
+	flags.StringArrayVarP(&option.portMapping, "port", "p", []string{}, "port mapping")
 	flags.StringArrayVarP(&option.environments, "env", "e", []string{}, "container running env (e.g., -e KEY1=value1 -e KEY2=value2)")
 
 	return cmd
@@ -81,6 +86,11 @@ func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
 		commands = getDefaultCommand(imageName, options.detach)
 	}
 
+	containerID := randStringBytes(10)
+	if options.containerName == "" {
+		options.containerName = containerID
+	}
+
 	// build the parent process that created the container
 	parent, writePipe := container.NewParentProcess(imageName, options.containerName, options.volume, options.enableTTY, options.environments)
 	if parent == nil {
@@ -90,9 +100,9 @@ func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
 	if err := parent.Start(); err != nil {
 		log.Error(err)
 	}
-	var err error
-	options.containerName, err = recordContainerInfo(parent.Process.Pid, options.containerName, options.volume, commands)
-	if err != nil {
+
+	// record container info
+	if err := recordContainerInfo(parent.Process.Pid, containerID, options.containerName, options.volume, commands); err != nil {
 		log.Errorf("record container info error %v.", err)
 		return
 	}
@@ -102,6 +112,20 @@ func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
 
 	cgroupManager.Set(res)
 	cgroupManager.Apply(parent.Process.Pid)
+
+	if options.network != "" {
+		// config container network
+		network.InitNetwork()
+		containerInfo := &container.ContainerInfo{
+			ID:          containerID,
+			PID:         strconv.Itoa(parent.Process.Pid),
+			Name:        options.containerName,
+			PortMapping: options.portMapping,
+		}
+		if err := network.Connect(options.network, containerInfo); err != nil {
+			log.Errorf("Error Connect Network %v", err)
+		}
+	}
 
 	sendInitCommand(commands, writePipe)
 	if options.enableTTY {
@@ -142,17 +166,13 @@ func sendInitCommand(commands []string, writePipe *os.File) {
 	writePipe.Close()
 }
 
-func recordContainerInfo(pid int, containerName string, volume string, commands []string) (string, error) {
-	cid := randStringBytes(10)
+func recordContainerInfo(pid int, containerId string, containerName string, volume string, commands []string) error {
 	createTime := time.Now().Format(time.DateTime)
-	command := strings.Join(commands, "")
+	command := strings.Join(commands, " ")
 	// if user not pick container name, then use cid as container name
-	if containerName == "" {
-		containerName = cid
-	}
 	containerInfo := &container.ContainerInfo{
 		PID:        strconv.Itoa(pid),
-		ID:         cid,
+		ID:         containerId,
 		Name:       containerName,
 		Command:    command,
 		CreateTime: createTime,
@@ -162,30 +182,30 @@ func recordContainerInfo(pid int, containerName string, volume string, commands 
 	data, err := sonic.Marshal(containerInfo)
 	if err != nil {
 		log.Errorf("record container info error %v", err)
-		return "", err
+		return err
 	}
 	json := string(data)
 	// container info path
 	dirUrl := fmt.Sprintf(container.DefaultLocation, containerName)
 	if err := os.MkdirAll(dirUrl, 0622); err != nil {
 		log.Errorf("mkdir error %s error %v.", dirUrl, err)
-		return "", err
+		return err
 	}
 	fileName := dirUrl + "/" + container.ConfigName
 	// create config.json
 	file, err := os.Create(fileName)
 	if err != nil {
 		log.Errorf("create file %s error %v.", fileName, err)
-		return "", err
+		return err
 	}
 	defer file.Close()
 
 	if _, err := file.WriteString(json); err != nil {
 		log.Errorf("file write string error %v", err)
-		return "", err
+		return err
 	}
 
-	return containerName, nil
+	return nil
 }
 
 func deleteContainerInfo(containerName string) {
