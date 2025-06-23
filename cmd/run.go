@@ -130,7 +130,12 @@ func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
 
 	sendInitCommand(commands, writePipe)
 	if options.enableTTY {
-		parent.Wait()
+		// Wait for the container process to finish
+		if err := parent.Wait(); err != nil {
+			log.Errorf("Container process exited with error: %v", err)
+		}
+		
+		// Clean up container info and workspace
 		deleteContainerInfo(options.containerName)
 		container.DeleteWorkSpace(options.containerName, options.volume)
 	} else {
