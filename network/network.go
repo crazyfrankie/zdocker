@@ -2,7 +2,6 @@ package network
 
 import (
 	"fmt"
-
 	"net"
 	"os"
 	"os/exec"
@@ -140,24 +139,25 @@ func Connect(networkName string, cinfo *container.ContainerInfo) error {
 		return fmt.Errorf("no Such Network: %s", networkName)
 	}
 
-	// 分配容器IP地址
+	// Assign container IP address
 	ip, err := ipAllocator.Allocate(network.IpRange)
 	if err != nil {
 		return err
 	}
 
-	// 创建网络端点
+	// Create network endpoints
 	ep := &Endpoint{
 		ID:          fmt.Sprintf("%s-%s", cinfo.ID, networkName),
 		IPAddress:   ip,
 		Network:     network,
 		PortMapping: cinfo.PortMapping,
 	}
-	// 调用网络驱动挂载和配置网络端点
+	// Call network driver to mount and configure network endpoints
 	if err = drivers[network.Driver].Connect(network, ep); err != nil {
 		return err
 	}
-	// 到容器的namespace配置容器网络设备IP地址
+
+	// Configure the container network device IP address in the container's namespace.
 	if err = configEndpointIpAddressAndRoute(ep, cinfo); err != nil {
 		return err
 	}
@@ -212,18 +212,18 @@ func enterContainerNetns(enLink *netlink.Link, cinfo *container.ContainerInfo) f
 	nsFD := f.Fd()
 	runtime.LockOSThread()
 
-	// 修改veth peer 另外一端移到容器的namespace中
+	// Modify that the other end of the veth peer is moved to the namespace of the container.
 	if err = netlink.LinkSetNsFd(*enLink, int(nsFD)); err != nil {
 		log.Errorf("error set link netns , %v", err)
 	}
 
-	// 获取当前的网络namespace
+	// Get the current network namespace
 	origns, err := netns.Get()
 	if err != nil {
 		log.Errorf("error get current netns, %v", err)
 	}
 
-	// 设置当前进程到新的网络namespace，并在函数执行完成之后再恢复到之前的namespace
+	// Set the current process to the new network namespace and revert to the previous namespace after the function has finished executing.
 	if err = netns.Set(netns.NsHandle(nsFD)); err != nil {
 		log.Errorf("error set netns, %v", err)
 	}
