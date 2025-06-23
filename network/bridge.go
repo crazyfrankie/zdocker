@@ -139,9 +139,9 @@ func setInterfaceIP(bridgeName string, rawIP string) error {
 	// which is equivalent to the addr add xxx command.
 	//
 	// Also, if the address is configured with the segment information, e.g. 192.168.0 0/24,
-	// the routing table 192 168 0/24 is configured to forward the address to the bridge.
+	// the routing table 192.168.0.0/24 is configured to forward the address to the bridge.
 	//
-	// The routing table 192 168 0/24 is also configured for forwarding to the bridge's network interface.
+	// The routing table 192.168.0.0/24 is also configured for forwarding to the bridge's network interface.
 	addr := &netlink.Addr{IPNet: ipNet}
 
 	return netlink.AddrAdd(iface, addr)

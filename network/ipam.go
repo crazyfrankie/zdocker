@@ -40,13 +40,20 @@ func (i *IPAM) Allocate(subnet *net.IPNet) (net.IP, error) {
 		// Fill this segment's configuration with "0", 1 << uint8(size - one) indicates how many addresses are available in this segment
 		// "size - one" is the number of network bits after the subnet mask, and 2 ^ (size - one) represents the available IPs in the segment.
 		// and 2 ^ (size - one) is equivalent to 1 << uint8(size - one)
-		(*i.Subnets)[subnet.String()] = make([]byte, 1<<uint8(size-ones))
+		subnetSize := 1 << uint8(size-ones)
+		bitmap := make([]byte, subnetSize)
+		// Initialize all bits to '0' character (ASCII 48) instead of null bytes
+		for i := range bitmap {
+			bitmap[i] = '0'
+		}
+		(*i.Subnets)[subnet.String()] = bitmap
 	}
 
 	for c, bit := range (*i.Subnets)[subnet.String()] {
 		if bit == '0' {
 			(*i.Subnets)[subnet.String()][c] = '1'
-			ip = subnet.IP
+			ip = make(net.IP, len(subnet.IP))
+			copy(ip, subnet.IP)
 			for t := uint(4); t > 0; t -= 1 {
 				[]byte(ip)[4-t] += uint8(c >> ((t - 1) * 8))
 			}

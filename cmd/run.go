@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/crazyfrank/zdocker/network"
 	"math/rand"
 	"os"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/crazyfrank/zdocker/cgroups"
 	"github.com/crazyfrank/zdocker/container"
+	"github.com/crazyfrank/zdocker/network"
 )
 
 const (
@@ -124,6 +124,7 @@ func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
 		}
 		if err := network.Connect(options.network, containerInfo); err != nil {
 			log.Errorf("Error Connect Network %v", err)
+			return
 		}
 	}
 

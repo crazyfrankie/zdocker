@@ -20,21 +20,6 @@ import (
 	"github.com/crazyfrank/zdocker/container"
 )
 
-// root@frank:/home/frank/projects/go/zdocker# ./zdocker network create --driver bridge --subnet 192.168.10.1/24 testbridge
-// root@frank:/home/frank/projects/go/zdocker# ./zdocker run -t --net testbridge busybox sh
-// {"level":"info","msg":"init come on","time":"2025-06-22T21:30:48+08:00"}
-// {"level":"error","msg":"Error Connect Network \u0026{testbridge 192.168.10.1/24 bridge},invalid CIDR address: \u003cnil\u003e","time":"2025-06-22T21:30:48+08:00"}
-// {"level":"info","msg":"current location is /root/mnt/2517245037","time":"2025-06-22T21:30:48+08:00"}
-// root@frank:/home/frank/projects/go/zdocker# {"level":"error","msg":"Exec loop path error exec: "": executable file not found in $PATH","time":"2025-06-22T21:30:48+08:00"}
-// Error: exec: "": executable file not found in $PATH
-// Usage:
-// zdocker init
-//
-// Flags:
-// -h, --help help for init
-//
-// exec: "": executable file not found in $PATH
-
 var (
 	defaultNetworkPath = "/var/run/zdocker/network/network/"
 	drivers            = map[string]NetworkDriver{}
@@ -326,4 +311,44 @@ func (nw *Network) remove(dumpPath string) error {
 	} else {
 		return os.Remove(filepath.Join(dumpPath, nw.Name))
 	}
+}
+
+// NetworkJSON is used for JSON serialization of Network
+type NetworkJSON struct {
+	Name    string `json:"name"`
+	IpRange string `json:"ipRange"` // CIDR string format
+	Driver  string `json:"driver"`
+}
+
+// MarshalJSON implements json.Marshaler interface
+func (nw *Network) MarshalJSON() ([]byte, error) {
+	networkJSON := NetworkJSON{
+		Name:   nw.Name,
+		Driver: nw.Driver,
+	}
+	if nw.IpRange != nil {
+		networkJSON.IpRange = nw.IpRange.String()
+	}
+	return sonic.Marshal(networkJSON)
+}
+
+// UnmarshalJSON implements json.Unmarshaler interface
+func (nw *Network) UnmarshalJSON(data []byte) error {
+	var networkJSON NetworkJSON
+	if err := sonic.Unmarshal(data, &networkJSON); err != nil {
+		return err
+	}
+
+	nw.Name = networkJSON.Name
+	nw.Driver = networkJSON.Driver
+
+	if networkJSON.IpRange != "" {
+		_, ipNet, err := net.ParseCIDR(networkJSON.IpRange)
+		if err != nil {
+			return fmt.Errorf("parse CIDR %s error: %v", networkJSON.IpRange, err)
+		}
+		nw.IpRange = ipNet
+	}
+
+	return nil
 }
