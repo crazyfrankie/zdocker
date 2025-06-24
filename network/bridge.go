@@ -129,9 +129,9 @@ func createBridgeInterface(bridgeName string) error {
 	return nil
 }
 
-// setInterfaceIP set the IP address of a network interface, e.g. setInterfaceIP(testbridge, "192 168.0.1124")
-func setInterfaceIP(bridgeName string, rawIP string) error {
-	iface, err := netlink.LinkByName(bridgeName)
+// setInterfaceIP set the IP address of a network interface
+func setInterfaceIP(interfaceName string, rawIP string) error {
+	iface, err := netlink.LinkByName(interfaceName)
 	if err != nil {
 		return fmt.Errorf("err get interface %v", err)
 	}

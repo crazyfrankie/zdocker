@@ -171,31 +171,39 @@ func configEndpointIpAddressAndRoute(ep *Endpoint, cinfo *container.ContainerInf
 		return fmt.Errorf("fail config endpoint: %v", err)
 	}
 
+	// Add the container's network endpoints to the container's network space,
+	// and makes the following operations of this function take place in that webspace
 	defer enterContainerNetns(&peerLink, cinfo)()
 
 	interfaceIP := *ep.Network.IpRange
 	interfaceIP.IP = ep.IPAddress
-
+	// Call the setInterfaceIP function to set the IP of the Veth endpoint within the container.
 	if err = setInterfaceIP(ep.Device.PeerName, interfaceIP.String()); err != nil {
 		return fmt.Errorf("%v,%s", ep.Network, err)
 	}
-
+	// set up the veth within container
 	if err = setInterfaceUp(ep.Device.PeerName); err != nil {
 		return err
 	}
-
+	// The default "lo" NIC in the Net Namespace at local address 127.0.0.1 is turned off.
+	// Enable it to ensure that the container accesses its own requests.
 	if err = setInterfaceUp("lo"); err != nil {
 		return err
 	}
 
+	// Set all external requests within the container to be accessed through the Veth endpoint within the container.
+	// 0.0.0.0 for all IP address segments.
 	_, cidr, _ := net.ParseCIDR("0.0.0.0/0")
-
+	// Construct the routing data to be added, including the network device, gateway IP, and destination network segment
+	// Equivalent to route add -net 0.0.0.0/0 gw {Bridge address} dev ｛Veth endpoint device in the container}.
 	defaultRoute := &netlink.Route{
 		LinkIndex: peerLink.Attrs().Index,
 		Gw:        ep.Network.IpRange.IP,
 		Dst:       cidr,
 	}
 
+	// Call netlink RouteAdd to add a route to the container's network space.
+	// The RouteAdd function is equivalent to the route add command.
 	if err = netlink.RouteAdd(defaultRoute); err != nil {
 		return err
 	}
