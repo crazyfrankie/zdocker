@@ -212,12 +212,21 @@ func configEndpointIpAddressAndRoute(ep *Endpoint, cinfo *container.ContainerInf
 }
 
 func enterContainerNetns(enLink *netlink.Link, cinfo *container.ContainerInfo) func() {
+	// Find the container's Net Namespace
+	// /proc/{pid}/ns/net Open the file descriptor of this file to manipulate the Net Namespace.
+	// The PID in the Container info is the process ID of the container mapped on the host.
+	// It corresponds to /proc/{pid}/ns/net, which is the container's internal Net Namespace.
 	f, err := os.OpenFile(fmt.Sprintf("/proc/%s/ns/net", cinfo.PID), os.O_RDONLY, 0)
 	if err != nil {
 		log.Errorf("error get container net namespace, %v", err)
 	}
 
 	nsFD := f.Fd()
+
+	// Lock the current thread of the program, if you don't lock the OS thread,
+	// the goroutine may be dispatched to another thread,
+	// and it's not guaranteed to be in the desired network space,
+	// So the call to runtime.LockOSThread locks the current program's thread.
 	runtime.LockOSThread()
 
 	// Modify that the other end of the veth peer is moved to the namespace of the container.
