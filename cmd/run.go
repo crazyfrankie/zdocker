@@ -102,7 +102,7 @@ func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
 	}
 
 	// record container info
-	if err := recordContainerInfo(parent.Process.Pid, containerID, options.containerName, options.volume, commands); err != nil {
+	if err := recordContainerInfo(parent.Process.Pid, containerID, options.containerName, options.volume, options.portMapping, commands); err != nil {
 		log.Errorf("record container info error %v.", err)
 		return
 	}
@@ -134,7 +134,7 @@ func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
 		if err := parent.Wait(); err != nil {
 			log.Errorf("Container process exited with error: %v", err)
 		}
-		
+
 		// Clean up container info and workspace
 		deleteContainerInfo(options.containerName)
 		container.DeleteWorkSpace(options.containerName, options.volume)
@@ -172,18 +172,19 @@ func sendInitCommand(commands []string, writePipe *os.File) {
 	writePipe.Close()
 }
 
-func recordContainerInfo(pid int, containerId string, containerName string, volume string, commands []string) error {
+func recordContainerInfo(pid int, containerId string, containerName string, volume string, portMapping []string, commands []string) error {
 	createTime := time.Now().Format(time.DateTime)
 	command := strings.Join(commands, " ")
 	// if user not pick container name, then use cid as container name
 	containerInfo := &container.ContainerInfo{
-		PID:        strconv.Itoa(pid),
-		ID:         containerId,
-		Name:       containerName,
-		Command:    command,
-		CreateTime: createTime,
-		Status:     container.RUNNING,
-		Volume:     volume,
+		PID:         strconv.Itoa(pid),
+		ID:          containerId,
+		Name:        containerName,
+		Command:     command,
+		CreateTime:  createTime,
+		Status:      container.RUNNING,
+		Volume:      volume,
+		PortMapping: portMapping,
 	}
 	data, err := sonic.Marshal(containerInfo)
 	if err != nil {

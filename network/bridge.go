@@ -48,7 +48,9 @@ func (b *BridgeNetworkDriver) Connect(network *Network, endpoint *Endpoint) erro
 	}
 
 	la := netlink.NewLinkAttrs()
+	// Due to linux interface name limitations, the name is the first 5 bits of the endpoint ID.
 	la.Name = endpoint.ID[:5]
+	//Set the Veth side to mount to the corresponding Linux Bridge on the network by setting the Veth interface master attribute.
 	la.MasterIndex = br.Attrs().Index
 
 	endpoint.Device = netlink.Veth{
@@ -56,6 +58,10 @@ func (b *BridgeNetworkDriver) Connect(network *Network, endpoint *Endpoint) erro
 		PeerName:  "cif-" + endpoint.ID[:5],
 	}
 
+	// Because the MasterIndex of the link is specified as the Linux Bridge for the network,
+	// the Veth end is already mounted on the Linux Bridge for the network.
+	//
+	// So the Veth side is already mounted on the Linux Bridge for the network.
 	if err = netlink.LinkAdd(&endpoint.Device); err != nil {
 		return fmt.Errorf("error Add Endpoint Device: %v", err)
 	}
@@ -74,6 +80,9 @@ func (b *BridgeNetworkDriver) Name() string {
 	return "bridge"
 }
 
+// initBridge First the Bridge device, then set the address and routing of the Bridge device,
+// then start the Bridge device, and finally set up iptabels' SNAT rules to ensure that
+// the Veth of containers mounted on the Bridge can access the external network.
 func (b *BridgeNetworkDriver) initBridge(n *Network) error {
 	bridgeName := n.Name
 

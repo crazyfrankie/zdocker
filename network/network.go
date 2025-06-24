@@ -162,7 +162,7 @@ func Connect(networkName string, cinfo *container.ContainerInfo) error {
 		return err
 	}
 
-	return configPortMapping(ep, cinfo)
+	return configPortMapping(ep)
 }
 
 func configEndpointIpAddressAndRoute(ep *Endpoint, cinfo *container.ContainerInfo) error {
@@ -235,7 +235,7 @@ func enterContainerNetns(enLink *netlink.Link, cinfo *container.ContainerInfo) f
 	}
 }
 
-func configPortMapping(ep *Endpoint, cinfo *container.ContainerInfo) error {
+func configPortMapping(ep *Endpoint) error {
 	for _, pm := range ep.PortMapping {
 		portMapping := strings.Split(pm, ":")
 		if len(portMapping) != 2 {
