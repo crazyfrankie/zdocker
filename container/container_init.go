@@ -61,8 +61,6 @@ func setUpMount() {
 	syscall.Mount("tmpfs", "/dev", "tmpfs", syscall.MS_NOSUID|syscall.MS_STRICTATIME, "mode=755")
 }
 
-// pivot root error: pivot_root invalid argument"
-
 // pivotRoot switches the current mount namespace's root filesystem to the specified path.
 //
 // It performs a bind-mount of `root` onto itself to ensure it is a mount point,
@@ -84,7 +82,7 @@ func pivotRoot(root string) error {
 	if err := os.Mkdir(pivotDir, 0777); err != nil {
 		return err
 	}
-	// pivot_root to the new rootfs, old_root is now mounted on rootfs/.pivot_root
+	// pivot_root to the new rootfs, old_root is now mounted on `rootfs/.pivot_root`
 	// The mount point is still visible in the mount command.
 	if err := syscall.PivotRoot(root, pivotDir); err != nil {
 		return fmt.Errorf("pivot_root %v", err)
@@ -98,10 +96,12 @@ func pivotRoot(root string) error {
 	if err := syscall.Unmount(pivotDir, syscall.MNT_DETACH); err != nil {
 		return fmt.Errorf("unmount pivot_root dir %v", err)
 	}
-	return os.RemoveAll(pivotDir)
+	// Remove the temporary .pivot_root directory
+	return os.Remove(pivotDir)
 }
 
 func readUserCommand() []string {
+	// Read index 3 (3rd file descriptor) from the pipe
 	pipe := os.NewFile(uintptr(3), "pipe")
 	msg, err := io.ReadAll(pipe)
 	if err != nil {

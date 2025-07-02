@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"syscall"
 
+	_ "github.com/crazyfrank/zdocker/nsenter"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -37,11 +37,10 @@ func NewParentProcess(imageName string, containerName string, volume string, tty
 		log.Errorf("New pipe error %v", err)
 		return nil, nil
 	}
+
+	os.Setenv("ZDOCKER_CREATE", "1")
+
 	cmd := exec.Command("/proc/self/exe", "init")
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS |
-			syscall.CLONE_NEWNET | syscall.CLONE_NEWIPC,
-	}
 	if tty {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
