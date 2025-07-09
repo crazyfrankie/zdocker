@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"strconv"
+	"syscall"
 	"text/tabwriter"
 
 	"github.com/bytedance/sonic"
@@ -41,6 +44,19 @@ func ListContainers() {
 			log.Errorf("get container info error %v.", err)
 			continue
 		}
+
+		// Check if container process is still running and update status if needed
+		if info.Status == container.RUNNING && info.PID != "" {
+			if !isProcessRunning(info.PID) {
+				if err := updateContainerStatusToExit(info.Name); err != nil {
+					log.Errorf("Failed to update container status: %v", err)
+				} else {
+					info.Status = container.EXIT
+					info.PID = ""
+				}
+			}
+		}
+
 		containerInfos = append(containerInfos, info)
 	}
 
@@ -83,4 +99,63 @@ func getContainerInfo(file os.DirEntry) (*container.ContainerInfo, error) {
 	}
 
 	return &info, nil
+}
+
+// isProcessRunning checks if a process with the given PID is still running
+func isProcessRunning(pidStr string) bool {
+	if pidStr == "" {
+		return false
+	}
+
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		log.Errorf("Invalid PID format: %s", pidStr)
+		return false
+	}
+
+	// Send signal 0 to check if process exists without affecting it
+	if err := syscall.Kill(pid, 0); err != nil {
+		// ESRCH means "No such process"
+		if errors.Is(err, syscall.ESRCH) {
+			return false
+		}
+		// Other errors might mean the process exists, but we don't have permission
+		// In this case, we assume the process is running
+		log.Warnf("Error checking process %d: %v", pid, err)
+		return true
+	}
+	return true
+}
+
+// updateContainerStatusToExit updates container status to EXIT and clears PID
+func updateContainerStatusToExit(containerName string) error {
+	dirUrl := fmt.Sprintf(container.DefaultLocation, containerName)
+	cfgFile := dirUrl + container.ConfigName
+
+	// Read current container info
+	content, err := os.ReadFile(cfgFile)
+	if err != nil {
+		return fmt.Errorf("read container config error: %v", err)
+	}
+
+	var info container.ContainerInfo
+	if err := sonic.Unmarshal(content, &info); err != nil {
+		return fmt.Errorf("unmarshal container info error: %v", err)
+	}
+
+	// Update status and clear PID
+	info.Status = container.EXIT
+	info.PID = ""
+
+	// Write back to file
+	newContent, err := sonic.Marshal(info)
+	if err != nil {
+		return fmt.Errorf("marshal container info error: %v", err)
+	}
+
+	if err := os.WriteFile(cfgFile, newContent, 0622); err != nil {
+		return fmt.Errorf("write container config error: %v", err)
+	}
+
+	return nil
 }

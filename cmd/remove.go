@@ -34,7 +34,7 @@ func removeContainer(containerName string) {
 		log.Errorf("get container info by name %s error %v.", containerName, err)
 		return
 	}
-	if info.Status != container.STOP {
+	if info.Status == container.RUNNING {
 		log.Errorf("cannot remove running container")
 		return
 	}
