@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/exec"
 
-	_ "github.com/crazyfrank/zdocker/nsenter"
+	_ "github.com/crazyfrankie/zdocker/nsenter"
 	log "github.com/sirupsen/logrus"
 )
 

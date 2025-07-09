@@ -4,7 +4,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/crazyfrank/zdocker/container"
+	"github.com/crazyfrankie/zdocker/container"
 )
 
 func NewInitCommand() *cobra.Command {

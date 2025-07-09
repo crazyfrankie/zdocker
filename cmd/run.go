@@ -13,9 +13,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/crazyfrank/zdocker/cgroups"
-	"github.com/crazyfrank/zdocker/container"
-	"github.com/crazyfrank/zdocker/network"
+	"github.com/crazyfrankie/zdocker/cgroups"
+	"github.com/crazyfrankie/zdocker/container"
+	"github.com/crazyfrankie/zdocker/network"
 )
 
 const (
@@ -130,12 +130,7 @@ func Run(options runOptions, args []string, res *cgroups.ResourceConfig) {
 
 	sendInitCommand(commands, writePipe)
 	if options.enableTTY {
-		// Wait for the container process to finish
-		if err := parent.Wait(); err != nil {
-			log.Errorf("Container process exited with error: %v", err)
-		}
-
-		// Clean up container info and workspace
+		parent.Wait()
 		deleteContainerInfo(options.containerName)
 		container.DeleteWorkSpace(options.containerName, options.volume)
 	} else {

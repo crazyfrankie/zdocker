@@ -1,6 +1,6 @@
 package main
 
-import "github.com/crazyfrank/zdocker/cmd"
+import "github.com/crazyfrankie/zdocker/cmd"
 
 func main() {
 	cmd.Execute()
